@@ -19,18 +19,20 @@
 #define MAX_SLEEP_TIME 3
 
 // Declare global semaphore variables. Note, they must be initialized before use.
-psem_t *sem;
+psem_t *sem1;
+psem_t *sem2;
 
 /* TODO: Make the two threads perform their iterations in lockstep. */
 
-void *
-threadA(void *param __attribute__((unused)))
+void *threadA(void *param __attribute__((unused)))
 {
     int i;
 
     for (i = 0; i < LOOPS; i++) {
+        psem_wait(sem1);
         printf("A%d\n", i);
         sleep(rand() % MAX_SLEEP_TIME);
+        psem_signal(sem2);
     }
 
     pthread_exit(0);
@@ -39,28 +41,29 @@ threadA(void *param __attribute__((unused)))
 
 /* TODO: Make the two threads perform their iterations in lockstep. */
 
-void *
-threadB(void *param  __attribute__((unused)))
+void *threadB(void *param  __attribute__((unused)))
 {
     int i;
 
     for (i = 0; i < LOOPS; i++) {
+        psem_wait(sem2);
         printf("B%d\n", i);
         sleep(rand() % MAX_SLEEP_TIME);
+        psem_signal(sem1);
     }
 
     pthread_exit(0);
 }
 
-int
-main()
+int main()
 {
     pthread_t tidA, tidB;
 
     // Todo: Initialize semaphores.
 
-    sem = psem_init(666);
-    
+    sem1 = psem_init(1);
+    sem2 = psem_init(1);    
+
     srand(time(NULL));
     pthread_setconcurrency(3);
 
@@ -76,7 +79,8 @@ main()
     }
 
     // Todo: Destroy semaphores.
-    psem_destroy(sem);
+    psem_destroy(sem1);
+    psem_destroy(sem2);    
 
     return 0;
 }
