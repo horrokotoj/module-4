@@ -118,7 +118,6 @@ void spin_lock() {
     while(__sync_lock_test_and_set(&lock, 1)) {
         /*wait*/
     }
-    lock = true;
 }
 
 void spin_unlock() {
