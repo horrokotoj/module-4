@@ -89,4 +89,9 @@ void  done();
 */
 tid_t join();
 
+/* Run the first thread in the ready queue
+   
+*/
+void  startup();
+
 #endif

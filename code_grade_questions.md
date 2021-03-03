@@ -8,7 +8,7 @@ E.g. the incrementation.
 ```
 ### b) Mutual exclusion (mutex).
 ```bash
-Only one thread should be allowed acces to the critical section at one time.
+Only one thread should be allowed access to the critical section at one time.
 ```
 ### c) Race condition.
 ```bash
