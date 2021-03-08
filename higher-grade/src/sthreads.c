@@ -27,12 +27,21 @@
                 Add data structures to manage the threads here.
 ********************************************************************************/
 
-//
+typedef struct wait_tuple wait_tuple_t;
+
+struct wait_tuple {
+  thread_t *waiting_thread;
+  tid_t tid;
+  wait_tuple_t *next;
+};
+
+
+
 struct thread_manager {
   thread_t *first_ready;
   thread_t *last_ready;
-  thread_t *first_waiting;
-  thread_t *last_waiting;
+  wait_tuple_t *first_waiting;
+  wait_tuple_t *last_waiting;
   thread_t *first_terminated;
   thread_t *last_terminated;
   thread_t *running;
@@ -46,6 +55,7 @@ struct thread_manager {
 typedef struct thread_manager thread_manager_t;
 
 thread_manager_t *manager = NULL;
+
 
 
 /*******************************************************************************
@@ -62,25 +72,35 @@ void add_to_ready(thread_t *thread) {
   }
 
   manager->last_ready = thread;
-  ++manager->size_ready;
+  manager->size_ready++;
 }
+
 /**
- * Adds a thread to the waiting queue.
+ * @brief Adds a thread to the waiting queue.
  * @param thread the thread to add
  */ 
-void add_to_waiting(thread_t *thread) {
-  if (manager->size_waiting == 0) {
-    manager->first_waiting = thread;
-  } else {
-    manager->last_waiting->next = thread;
-  }
 
-  manager->last_waiting = thread;
-  ++manager->size_waiting;
+/**
+ * @brief Adds a thread to the waiting queue.
+ * @param thread the thread to add
+ */ 
+void add_to_waiting(thread_t *thread, tid_t tid) {
+  wait_tuple_t *wait_tuple = calloc(1, sizeof(wait_tuple));
+  wait_tuple->waiting_thread = thread;
+  wait_tuple->tid = tid;
+
+  if (manager->size_waiting == 0) {
+    manager->first_waiting = wait_tuple;
+  } else {
+    manager->last_waiting->next = wait_tuple;
+  }
+  
+  manager->last_waiting = wait_tuple;
+  manager->size_waiting++;
 }
 
 /**
- * Adds a thread to the terminated queue.
+ * @brief Adds a thread to the terminated queue.
  * @param thread the thread to add
  */
 void add_to_terminated(thread_t *thread) {
@@ -109,14 +129,50 @@ thread_t *get_ready() {
   return thread;
 }
 
-thread_t *get_waiting() {
-  if (!manager->size_waiting) return NULL;
+
+/**
+ * @brief Get the thread waiting for the specific tid
+ * @param tid The thread id to check if anyone is waiting for
+ * @return The waiting thread if found else NULL
+ */
+thread_t *get_waiting(tid_t tid) {
+
+  // If empty return NULL
+  if (manager->size_waiting == 0) {
+    return NULL;
+  }
+
+  wait_tuple_t *waiting = manager->first_waiting;
+  thread_t *new_thread;
   
-  thread_t *thread = manager->first_waiting;
-  manager->first_waiting = thread->next;
-  thread->next = NULL;
-  manager->size_waiting--;
-  return thread;
+  // If first entry
+  if (waiting->tid == tid) {
+    manager->first_waiting = NULL;
+    if (waiting->next == NULL) { 
+      manager->last_waiting = NULL;
+    }
+    manager->size_waiting--;
+    new_thread = waiting->waiting_thread;
+    free(waiting);
+    return new_thread;
+  }
+    
+  wait_tuple_t *previous;
+  //Else go through the rest
+  while (waiting->next) {
+    previous = waiting;
+    waiting = waiting->next;
+    if (waiting->tid == tid) {
+      previous->next = waiting->next;
+      if (waiting->next == NULL) { 
+        manager->last_waiting = NULL;
+      }
+      new_thread = waiting->waiting_thread;
+      free(waiting);
+      return new_thread;
+    }
+  }
+  return NULL;
 }
 
 thread_t *get_terminated() {
@@ -162,6 +218,14 @@ int  init(){
   manager->size_waiting = 0;
   manager->size_terminated = 0;  
   manager->id_counter = 1;
+
+
+/*
+  thread->ctx.uc_stack.ss_sp = malloc(STACK_SIZE);
+  thread->ctx.uc_stack.ss_size = STACK_SIZE;
+  thread->ctx.uc_stack.ss_flags = 0;
+  */
+
 
   return 1;
 }
@@ -219,7 +283,13 @@ tid_t spawn(void (*start)()){
    state and change the state of the calling thread from running to ready.
 */
 void yield() {
-  if (manager == NULL || manager->size_ready == 0 || manager->running == NULL) {
+  if (manager == NULL) {
+    return;
+  }
+  if (manager->size_ready == 0) {
+    return;
+  }
+  if (manager->running == NULL) {
     return;
   }
   thread_t *old_thread = manager->running;
@@ -239,10 +309,20 @@ void yield() {
    threads.
 */
 void  done(){
+  thread_t *done_thread = manager->running;
+  done_thread->state = terminated;
+ 
+  thread_t *new_thread = get_waiting(done_thread->tid);
+  if (new_thread == NULL) {
+    new_thread = get_ready();    
+  }
+  if (new_thread == NULL) {
+    return;
+  }
+  new_thread->state = running;
+  manager->running = new_thread;
+  swapcontext(&new_thread->ctx, &done_thread->ctx);
 }
-
-
-
 
 
 /* Join with a terminated thread
@@ -256,7 +336,14 @@ void  done(){
    thread id thread calls done and join() should then return the thread id of the
    terminated thread.
 */
-tid_t join() {
+tid_t join(tid_t tid) {
+  thread_t *old_thread = manager->running;
+  old_thread->state = waiting;
+  add_to_waiting(old_thread, tid);
+  thread_t *new_thread = get_ready();
+  new_thread->state = running;
+  manager->running = new_thread;
+  swapcontext(&old_thread->ctx, &manager->running->ctx);  
   return -1;
 }
 
@@ -267,5 +354,4 @@ void startup(){
     manager->running = thread;
     setcontext(&thread->ctx);
   }
-  
 }

@@ -18,7 +18,7 @@ void numbers() {
   while (true) {
     printf(" n = %d\n", n);
     n = (n + 1) % (INT_MAX);
-    if (n > 3) done();
+    //if (n > 3) done();
     yield();
   }
 }
@@ -30,7 +30,7 @@ void letters() {
 
   while (true) {
       printf(" c = %c\n", c);
-      if (c == 'f') done();
+      //if (c == 'f') done();
       yield();
       c = (c == 'z') ? 'a' : c + 1;
     }
@@ -132,7 +132,7 @@ int main(){
   init(); // Initialization
   spawn(numbers);
   spawn(letters);
-  spawn(magic_numbers);
+  //spawn(magic_numbers);
   startup();
-  return 0;
+  exit(EXIT_SUCCESS);
 }
