@@ -1,3 +1,4 @@
+//#pragma once
 #include <stdlib.h>   // exit(), EXIT_FAILURE, EXIT_SUCCESS
 #include <signal.h>   // sigaction()
 #include <stdio.h>    // printf(), fprintf(), stdout, stderr, perror(), _IOLBF
@@ -5,8 +6,9 @@
 #include <sys/time.h> // ITIMER_REAL, ITIMER_VIRTUAL, ITIMER_PROF, struct itimerval, setitimer()
 #include <stdbool.h>  // true, false 
 #include <limits.h>   // INT_MAX
+#include "sthreads.h"
 
-#define TIMEOUT    50          // ms 
+#define TIMEOUT    100          // ms 
 #define TIMER_TYPE ITIMER_REAL // Type of timer.
 
 static volatile int foo;
@@ -27,14 +29,16 @@ int timer_signal(int timer_type) {
 
   switch (timer_type) {
     case ITIMER_REAL:
+      yield();
       sig = SIGALRM;
       break;
-    case ITIMER_VIRTUAL:
+/*    case ITIMER_VIRTUAL:
       sig = SIGVTALRM;
       break;
     case ITIMER_PROF:
       sig = SIGPROF;
       break;
+*/      
     default:
       fprintf(stderr, "ERROR: unknown timer type %d!\n", timer_type);
       exit(EXIT_FAILURE);
@@ -45,15 +49,10 @@ int timer_signal(int timer_type) {
 
 
 /* Set a timer and a handler for the timer.
-
    Arguments
-
    type: type of timer, one of ITIMER_REAL, ITIMER_VIRTUAL, or ITIMER_PROF.
-
    handler: timer signal handler.
-
    ms: time in ms for the timer. 
-
  */
 void set_timer(int type, void (*handler) (int), int ms) {
   struct itimerval timer;
@@ -62,10 +61,10 @@ void set_timer(int type, void (*handler) (int), int ms) {
   /* Install signal handler for the timer. */
   memset(&sa, 0, sizeof (sa));
   sa.sa_handler =  handler;
-  sigaction (timer_signal(type), &sa, NULL);
+  sigaction(timer_signal(type), &sa, NULL);
 
   /* Configure the timer to expire after ms msec... */
-  timer.it_value.tv_sec = 0;
+  timer.it_value.tv_sec = 1;
   timer.it_value.tv_usec = ms*1000;
   timer.it_interval.tv_sec = 0;
   timer.it_interval.tv_usec = 0;
@@ -83,60 +82,9 @@ void timer_handler (int signum) {
   set_timer(TIMER_TYPE, timer_handler, TIMEOUT);
 }
 
-
-/* Calculate the nth Fibonacci number using recursion. */
-int fib(int n) {
-  switch (n) {
-    case 0:
-      return 0;
-    case 1:
-      return 1;
-    default:
-      return fib(n-1) + fib(n-2);
-  }
-}
-
-/* Print the Fibonacci number sequence over and over again.
-
-   This is deliberately an unnecessary slow and CPU intensive
-   implementation where each number in the sequence is calculated recursively
-   from scratch.
-*/
-
-void fibonacci_slow() {
-  int n = 0;
-  while (true) {
-    printf(" fib(%d) = %d\n", n, fib(n));
-    n = (n + 1) % INT_MAX;
-  }
-}
-
-/* Print the Fibonacci number sequence over and over again.
-
-   This implementation is much faster than fibonacci(). 
-*/
-void fibonacci_fast() {
-  int a = 0;
-  int b = 1;
-  int n = 0;
-  int next = a + b;
-
-  while(true) {
-    printf(" fib(%d) = %d\n", n, a);
-    next = a + b;
-    a = b;
-    b = next;
-    n++;
-    if (next < 0) {
-      a = 0;
-      b = 1;
-      n = 0;
-    }
-  }
-}
-
+/*
 int main () {
-  /* Flush each printf() as it happens. */
+  // Flush each printf() as it happens.
   setvbuf(stdout, 0, _IOLBF, 0);
   setvbuf(stderr, 0, _IOLBF, 0);
 
@@ -144,3 +92,4 @@ int main () {
 
   fibonacci_slow();
 }
+*/

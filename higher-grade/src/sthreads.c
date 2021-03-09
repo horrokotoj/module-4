@@ -185,9 +185,6 @@ thread_t *get_terminated() {
   return thread;
 }
 
-
-
-
 /*******************************************************************************
                     Implementation of the Simple Threads API
 ********************************************************************************/
@@ -213,19 +210,26 @@ int  init(){
   manager->last_waiting = NULL;
   manager->first_terminated = NULL;
   manager->last_terminated = NULL;
-  manager->running = NULL;
   manager->size_ready = 0;
   manager->size_waiting = 0;
   manager->size_terminated = 0;  
-  manager->id_counter = 1;
+  manager->id_counter = 0;
 
 
-/*
+  thread_t *thread = calloc(1, sizeof(thread_t));
+  if (thread == NULL) return -1;
   thread->ctx.uc_stack.ss_sp = malloc(STACK_SIZE);
   thread->ctx.uc_stack.ss_size = STACK_SIZE;
   thread->ctx.uc_stack.ss_flags = 0;
-  */
-
+  if (getcontext(&thread->ctx) == -1) {
+    puts("getcontext failed");
+    free(thread);
+    return -1;
+  }
+  thread->state = running;
+  manager->running = thread;
+  thread->tid = manager->id_counter++;
+  //printf("%d\n", thread->tid);
 
   return 1;
 }
@@ -243,17 +247,16 @@ int  init(){
 tid_t spawn(void (*start)()){
   thread_t *thread = calloc(1, sizeof(thread_t));
   if (thread == NULL) return -1;
-  puts("CALLOC in spawn SUCCESSFUL");
+  //puts("CALLOC in spawn SUCCESSFUL");
 
   
   thread->tid = manager->id_counter++;
-  thread->state = ready;
   thread->next = NULL;
   thread->ctx.uc_link = NULL;
   thread->ctx.uc_stack.ss_sp = malloc(STACK_SIZE);
   thread->ctx.uc_stack.ss_size = STACK_SIZE;
   thread->ctx.uc_stack.ss_flags = 0;
-  puts("manager updated");
+  //puts("manager updated");
 
   if (getcontext(&thread->ctx) == -1) {
     puts("getcontext failed");
@@ -263,18 +266,26 @@ tid_t spawn(void (*start)()){
   }
   if (start == NULL) printf("Start == NULL");
 
-  puts("getcontext SUCCESSFUL");
+  //puts("getcontext SUCCESSFUL");
 
   makecontext(&thread->ctx, start, 0); // TODO: change 0 to something correct
-  puts("makecontext SUCCESSFUL");     
-
-  add_to_ready(thread);  
-  //setcontext(&manager->first_ready->ctx);
+  //puts("makecontext SUCCESSFUL");     
+  thread_t *old_thread = manager->running;
+  old_thread->state = ready;
+  add_to_ready(old_thread);
+  manager->running = thread;
+  thread->state = running;
+  swapcontext(&old_thread->ctx, &thread->ctx);
 
   return thread->tid;
 }
 
-
+// Main - letters
+// letters - Main
+// numbers - letters - main
+// letters - main - numbers
+// main - numbers - letters
+// magicnumbers - numbers - letters - main
 
 /* Cooperative scheduling
 
@@ -311,17 +322,18 @@ void yield() {
 void  done(){
   thread_t *done_thread = manager->running;
   done_thread->state = terminated;
- 
+  add_to_terminated(done_thread);
+  
   thread_t *new_thread = get_waiting(done_thread->tid);
   if (new_thread == NULL) {
     new_thread = get_ready();    
   }
   if (new_thread == NULL) {
-    return;
+    puts("not ready thread");
   }
   new_thread->state = running;
   manager->running = new_thread;
-  swapcontext(&new_thread->ctx, &done_thread->ctx);
+  swapcontext(&done_thread->ctx, &new_thread->ctx);
 }
 
 
@@ -344,14 +356,27 @@ tid_t join(tid_t tid) {
   new_thread->state = running;
   manager->running = new_thread;
   swapcontext(&old_thread->ctx, &manager->running->ctx);  
-  return -1;
+  return tid;
 }
 
-void startup(){
-  if (manager && manager->running == NULL) {
-    thread_t *thread = get_ready();
-    thread->state = running;
-    manager->running = thread;
-    setcontext(&thread->ctx);
+void cleanup() {
+  thread_t *terminated = manager->first_terminated;
+  thread_t *tmp;
+  while(terminated) {
+    tmp = terminated;
+    terminated = tmp->next;
+    free(tmp->ctx.uc_stack.ss_sp);
+    free(tmp);
   }
+  thread_t *ready = manager->first_ready;
+  while(ready) {
+    tmp = ready;
+    ready = tmp->next;
+    free(tmp->ctx.uc_stack.ss_sp);
+    free(tmp);
+  }
+  manager->last_terminated = NULL;
+  free(manager->running->ctx.uc_stack.ss_sp);
+  free(manager->running);
+  free(manager);
 }

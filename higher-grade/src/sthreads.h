@@ -92,6 +92,6 @@ tid_t join();
 /* Run the first thread in the ready queue
    
 */
-void  startup();
+void  cleanup();
 
 #endif

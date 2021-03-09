@@ -10,11 +10,14 @@ endif
 
 .PHONY: all clean
 
-bin/sthreads_test: obj/sthreads_test.o obj/sthreads.o src/sthreads.h
+bin/sthreads_test: obj/sthreads_test.o obj/sthreads.o src/sthreads.h obj/timer.o src/timer.h
 	$(CC) $(CFLAGS) $(LDLIBS) $(filter-out src/sthreads.h, $^) -o $@
 
 obj/sthreads.o: src/sthreads.c src/sthreads.h
 	$(CC) $(CFLAGS) -c  $(filter-out src/sthreads.h, $^) -o $@
+
+obj/timer.o: src/timer.c src/timer.h
+	$(CC) $(CFLAGS) -c  $(filter-out src/timer.h, $^) -o $@
 
 obj/%.o: src/%.c
 	$(CC) $(CFLAGS) -c  $< -o $@

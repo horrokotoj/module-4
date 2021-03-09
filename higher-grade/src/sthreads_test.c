@@ -2,8 +2,10 @@
 #include <stdio.h>    // printf(), fprintf(), stdout, stderr, perror(), _IOLBF
 #include <stdbool.h>  // true, false
 #include <limits.h>   // INT_MAX
+#include <sys/time.h>
 
 #include "sthreads.h" // init(), spawn(), yield(), done()
+#include "timer.h"
 
 /*******************************************************************************
                    Functions to be used together with spawn()
@@ -18,7 +20,7 @@ void numbers() {
   while (true) {
     printf(" n = %d\n", n);
     n = (n + 1) % (INT_MAX);
-    //if (n > 3) done();
+    if (n > 3) done();
     yield();
   }
 }
@@ -30,7 +32,7 @@ void letters() {
 
   while (true) {
       printf(" c = %c\n", c);
-      //if (c == 'f') done();
+      if (c == 'f') done();
       yield();
       c = (c == 'z') ? 'a' : c + 1;
     }
@@ -128,11 +130,27 @@ void magic_numbers() {
 
 int main(){
   puts("\n==== Test program for the Simple Threads API ====\n");
+  set_timer(TIMER_TYPE, timer_handler, TIMEOUT);
+  if (init() == -1) {
+    puts("Init failed");
+  } // Initialization
+  tid_t tid_letters = spawn(letters);
+  printf("%d\n", tid_letters);
+  
+  tid_t tid_numbers = spawn(numbers);
+  printf("%d\n", tid_numbers);
 
-  init(); // Initialization
-  spawn(numbers);
-  spawn(letters);
-  //spawn(magic_numbers);
-  startup();
+  tid_t tid_magic_numbers = spawn(magic_numbers);
+  printf("%d\n", tid_magic_numbers);
+
+  tid_t tid_fibonacci_fast = spawn(fibonacci_slow);
+  printf("%d\n", tid_fibonacci_fast);
+
+  tid_t join_letters = join(1);
+  printf("%d\n", join_letters);
+  /*for (int i = 0; i < 15; i++){
+    yield();
+  }*/
+  cleanup();
   exit(EXIT_SUCCESS);
 }
