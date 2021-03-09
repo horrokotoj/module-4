@@ -7,6 +7,9 @@
 #include "sthreads.h" // init(), spawn(), yield(), done()
 #include "timer.h"
 
+#define TIMEOUT    100          // ms 
+#define TIMER_TYPE ITIMER_REAL // Type of timer.
+
 /*******************************************************************************
                    Functions to be used together with spawn()
 
