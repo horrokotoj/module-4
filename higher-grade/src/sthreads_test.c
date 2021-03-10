@@ -136,6 +136,7 @@ int main(){
   set_timer(TIMER_TYPE, timer_handler, TIMEOUT);
   if (init() == -1) {
     puts("Init failed");
+    exit(EXIT_FAILURE);
   } // Initialization
   tid_t tid_letters = spawn(letters);
   printf("%d\n", tid_letters);
@@ -149,7 +150,7 @@ int main(){
   tid_t tid_fibonacci_fast = spawn(fibonacci_slow);
   printf("%d\n", tid_fibonacci_fast);
 
-  tid_t join_letters = join(1);
+  tid_t join_letters = join(tid_letters);
   printf("%d\n", join_letters);
   /*for (int i = 0; i < 15; i++){
     yield();

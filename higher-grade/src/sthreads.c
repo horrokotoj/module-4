@@ -72,13 +72,10 @@ void add_to_ready(thread_t *thread) {
   }
 
   manager->last_ready = thread;
+  manager->last_ready->next = NULL;
   manager->size_ready++;
 }
 
-/**
- * @brief Adds a thread to the waiting queue.
- * @param thread the thread to add
- */ 
 
 /**
  * @brief Adds a thread to the waiting queue.
@@ -124,7 +121,12 @@ thread_t *get_ready() {
   
   thread_t *thread = manager->first_ready;
   manager->first_ready = thread->next;
-  thread->next = NULL;
+  if (thread->next == NULL) { 
+      manager->last_ready = NULL;
+  } else {
+    //Clean up next pointer
+    thread->next = NULL;
+  }
   manager->size_ready--;
   return thread;
 }
@@ -180,7 +182,12 @@ thread_t *get_terminated() {
   
   thread_t *thread = manager->first_terminated;
   manager->first_terminated = thread->next;
-  thread->next = NULL;
+  if (thread->next == NULL) { 
+      manager->last_terminated = NULL;
+  } else {
+    //Clean up next pointer
+    thread->next = NULL;
+  }
   manager->size_terminated--;
   return thread;
 }
@@ -217,7 +224,11 @@ int  init(){
 
 
   thread_t *thread = calloc(1, sizeof(thread_t));
-  if (thread == NULL) return -1;
+  if (thread == NULL) {
+    puts("calloc thread failed");
+    free(manager);
+    return -1;
+  }
   thread->ctx.uc_stack.ss_sp = malloc(STACK_SIZE);
   thread->ctx.uc_stack.ss_size = STACK_SIZE;
   thread->ctx.uc_stack.ss_flags = 0;
@@ -229,7 +240,6 @@ int  init(){
   thread->state = running;
   manager->running = thread;
   thread->tid = manager->id_counter++;
-  //printf("%d\n", thread->tid);
 
   return 1;
 }
@@ -247,8 +257,6 @@ int  init(){
 tid_t spawn(void (*start)()){
   thread_t *thread = calloc(1, sizeof(thread_t));
   if (thread == NULL) return -1;
-  //puts("CALLOC in spawn SUCCESSFUL");
-
   
   thread->tid = manager->id_counter++;
   thread->next = NULL;
@@ -256,7 +264,6 @@ tid_t spawn(void (*start)()){
   thread->ctx.uc_stack.ss_sp = malloc(STACK_SIZE);
   thread->ctx.uc_stack.ss_size = STACK_SIZE;
   thread->ctx.uc_stack.ss_flags = 0;
-  //puts("manager updated");
 
   if (getcontext(&thread->ctx) == -1) {
     puts("getcontext failed");
@@ -264,28 +271,19 @@ tid_t spawn(void (*start)()){
     free(thread);
     return -1;
   }
-  if (start == NULL) printf("Start == NULL");
 
-  //puts("getcontext SUCCESSFUL");
-
-  makecontext(&thread->ctx, start, 0); // TODO: change 0 to something correct
-  //puts("makecontext SUCCESSFUL");     
+  makecontext(&thread->ctx, start, 0);
+  // Add old to ready queue
   thread_t *old_thread = manager->running;
   old_thread->state = ready;
   add_to_ready(old_thread);
+  // Make created thread running
   manager->running = thread;
   thread->state = running;
   swapcontext(&old_thread->ctx, &thread->ctx);
 
   return thread->tid;
 }
-
-// Main - letters
-// letters - Main
-// numbers - letters - main
-// letters - main - numbers
-// main - numbers - letters
-// magicnumbers - numbers - letters - main
 
 /* Cooperative scheduling
 
@@ -304,8 +302,10 @@ void yield() {
     return;
   }
   thread_t *old_thread = manager->running;
+  old_thread->state = ready;
   add_to_ready(manager->running);
-  manager->running =  get_ready();
+  manager->running = get_ready();
+  manager->running->state = running;
   swapcontext(&old_thread->ctx, &manager->running->ctx);
 }
 
